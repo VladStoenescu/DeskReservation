@@ -11,6 +11,9 @@ build/
 # Database (auto-generated at runtime)
 bookings.db
 
+# Booking activity log (auto-generated at runtime)
+reservation.log
+
 # React / Node
 frontend/node_modules/
 frontend/dist/
