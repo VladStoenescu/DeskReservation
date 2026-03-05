@@ -213,9 +213,11 @@ class CalendarWidget(tk.Frame):
     _DAY_H = 40   # cell height
 
     def __init__(self, parent: tk.Widget,
-                 selected: Optional[Set[date]] = None, **kw) -> None:
+                 selected: Optional[Set[date]] = None,
+                 on_change=None, **kw) -> None:
         super().__init__(parent, bg=C_CARD, **kw)
         self.selected: Set[date] = selected if selected is not None else set()
+        self._on_change   = on_change   # callable() invoked after each toggle
         self._today       = date.today()
         self._view_year   = self._today.year
         self._view_month  = self._today.month
@@ -301,6 +303,8 @@ class CalendarWidget(tk.Frame):
         else:
             self.selected.add(d)
         self._render()
+        if self._on_change is not None:
+            self._on_change()
 
     def _prev_month(self) -> None:
         if self._view_month == 1:
@@ -477,7 +481,7 @@ class BookingScreen(_Screen):
         left = tk.Frame(self._content, bg=C_BG)
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self._cal = CalendarWidget(left)
+        self._cal = CalendarWidget(left, on_change=self._update_summary)
         self._cal.pack(fill=tk.BOTH, expand=True)
 
         right = tk.Frame(self._content, bg=C_BG, width=200)
@@ -487,7 +491,8 @@ class BookingScreen(_Screen):
         self._summary_lbl = _lbl(right, "No days selected",
                                  bg=C_BG, fg=C_SUBTEXT, font=F_SMALL)
         self._summary_lbl.pack(pady=(20, 0))
-        self._cal.bind_all("<<CalendarChanged>>", self._update_summary)
+        # Show initial (empty) summary
+        self._update_summary()
 
         _btn(right, "✓  Save Booking", self._save_onetime,
              bg=C_FREE, fg=C_TEXT, font=F_MEDB,
@@ -523,7 +528,7 @@ class BookingScreen(_Screen):
             self._name = name
             self._name_lbl.config(text=name, fg=C_TEXT)
 
-    def _update_summary(self, _event=None) -> None:
+    def _update_summary(self) -> None:
         if self._cal is None:
             return
         n = len(self._cal.get_selected())

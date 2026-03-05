@@ -141,7 +141,10 @@ def add_bookings(name: str, dates: List[date]) -> None:
 def add_recurring_booking(name: str, weekday: int) -> None:
     """Add a weekly recurring booking for *weekday* (0=Monday … 6=Sunday).
 
-    Multiple recurring rules for the same weekday are allowed (different names).
+    When multiple recurring rules exist for the same weekday,
+    ``get_booking_for_date`` returns the first one inserted (oldest).
+    To avoid ambiguity it is recommended to have at most one recurring rule
+    per weekday; delete the old rule before adding a new one for the same day.
     """
     with _connect() as conn:
         conn.execute(
