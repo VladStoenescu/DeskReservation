@@ -44,7 +44,7 @@ export default function Calendar({ selectedDates, onChangeDates }) {
 
   // Build grid: first cell = Monday of the week that contains day 1
   const firstDay = new Date(viewYear, viewMonth, 1)
-  // getDay() returns 0=Sun; we want 0=Mon
+  // getDay() returns 0=Sun…6=Sat; convert to Monday-first (0=Mon…6=Sun): (0+6)%7=6 for Sun, (1+6)%7=0 for Mon
   const startOffset = (firstDay.getDay() + 6) % 7
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
 

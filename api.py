@@ -52,7 +52,7 @@ def api_status():
     booker = get_booking_for_date(today)
     return jsonify({
         "date": today.strftime("%Y-%m-%d"),
-        "display_date": today.strftime("%A, %-d %B %Y"),
+        "display_date": today.strftime("%A, %d %B %Y").replace(" 0", " "),
         "is_booked": bool(booker),
         "booker_name": booker or "",
     })
@@ -145,15 +145,18 @@ def main() -> None:
     init_db()
 
     port = 5000
-    debug = False
-    for i, arg in enumerate(sys.argv[1:], 1):
-        if arg == "--port" and i < len(sys.argv):
-            port = int(sys.argv[i + 1])
-        if arg == "--debug":
-            debug = True
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        if args[i] == "--port" and i + 1 < len(args):
+            port = int(args[i + 1])
+            i += 2
+        else:
+            i += 1
 
     host = os.environ.get("HOST", "0.0.0.0")
-    app.run(host=host, port=port, debug=debug)
+    # Debug mode is intentionally disabled; use a WSGI server (e.g. gunicorn) for production.
+    app.run(host=host, port=port, debug=False)
 
 
 if __name__ == "__main__":

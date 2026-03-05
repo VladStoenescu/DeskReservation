@@ -345,10 +345,10 @@ class StatusCard(tk.Frame):
         )
         self.pack_propagate(False)
 
-        status_color = C_BOOKED if is_booked else C_FREE
+        status_colour = C_BOOKED if is_booked else C_FREE
 
         # Colour bar on the left
-        bar = tk.Frame(self, bg=status_color, width=8)
+        bar = tk.Frame(self, bg=status_colour, width=8)
         bar.pack(side=tk.LEFT, fill=tk.Y)
         bar.pack_propagate(False)
 
@@ -359,7 +359,7 @@ class StatusCard(tk.Frame):
             tk.Label(
                 content,
                 text="DESK IS BOOKED",
-                bg=C_CARD, fg=status_color,
+                bg=C_CARD, fg=status_colour,
                 font=("Helvetica", 18, "bold"),
                 anchor="w",
             ).pack(fill=tk.X)
@@ -374,7 +374,7 @@ class StatusCard(tk.Frame):
             tk.Label(
                 content,
                 text="DESK IS AVAILABLE",
-                bg=C_CARD, fg=status_color,
+                bg=C_CARD, fg=status_colour,
                 font=("Helvetica", 24, "bold"),
                 anchor="w",
             ).pack(fill=tk.BOTH, expand=True)

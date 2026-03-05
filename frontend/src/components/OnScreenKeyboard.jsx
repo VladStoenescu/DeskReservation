@@ -25,7 +25,16 @@ export default function OnScreenKeyboard({ initialValue, onConfirm, onCancel }) 
   }
 
   return (
-    <div className="osk-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}>
+    <div
+      className="osk-backdrop"
+      role="button"
+      tabIndex={0}
+      aria-label="Close keyboard"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' || (e.key === 'Enter' && e.target === e.currentTarget)) onCancel()
+      }}
+    >
       <div className="osk" role="dialog" aria-label="On-screen keyboard">
         {/* Text display */}
         <div className="osk-display" aria-live="polite">
