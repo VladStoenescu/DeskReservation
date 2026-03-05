@@ -7,11 +7,24 @@ Run with:
 """
 
 import sys
+import os
+import logging
+import random
 import calendar
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Set
 
 import tkinter as tk
+
+# ─── Logging ─────────────────────────────────────────────────────────────────
+_LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reservation.log")
+logging.basicConfig(
+    filename=_LOG_PATH,
+    level=logging.INFO,
+    format="%(asctime)s  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+_log = logging.getLogger(__name__)
 
 from database import (
     init_db,
@@ -48,7 +61,8 @@ F_MED   = ("Helvetica", 12)
 F_MEDB  = ("Helvetica", 12, "bold")
 F_SMALL = ("Helvetica", 10)
 
-# ─── Weekday names ────────────────────────────────────────────────────────────
+# ─── Layout constants ────────────────────────────────────────────────────────
+_WEEKLY_WIDGET_W = 320    # width of the right-panel weekly availability widget
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 WEEKDAY_SHORT = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 
@@ -332,18 +346,13 @@ class CalendarWidget(tk.Frame):
 class StatusCard(tk.Frame):
     """Corporate-style status card showing whether the desk is free or booked."""
 
-    _W = 700
-    _H = 140
-
     def __init__(self, parent: tk.Widget,
                  is_booked: bool, booker_name: str = "") -> None:
         super().__init__(
             parent,
             bg=C_CARD,
-            width=self._W, height=self._H,
             highlightbackground=C_BORDER, highlightthickness=1,
         )
-        self.pack_propagate(False)
 
         status_colour = C_BOOKED if is_booked else C_FREE
 
@@ -378,6 +387,100 @@ class StatusCard(tk.Frame):
                 font=("Helvetica", 24, "bold"),
                 anchor="w",
             ).pack(fill=tk.BOTH, expand=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Weekly availability widget (fun right-panel widget)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_QUOTES = [
+    "Great desks are made by great people. 🌟",
+    "A tidy desk is a tidy mind. 🧹",
+    "Collaboration starts at the desk. 🤝",
+    "You're going to have a productive day! 💪",
+    "Every expert was once a beginner. 📚",
+    "Teamwork makes the dream work. 🚀",
+    "Small progress is still progress. ✅",
+    "Stay focused — you've got this! 🎯",
+]
+
+
+class WeeklyAvailabilityWidget(tk.Frame):
+    """Compact 7-day desk availability panel plus a rotating fun quote."""
+
+    _QUOTE_ROTATION_MS = 15_000
+
+    def __init__(self, parent: tk.Widget, **kw) -> None:
+        super().__init__(parent, bg=C_CARD,
+                         highlightbackground=C_BORDER, highlightthickness=1,
+                         **kw)
+        self._last_quote: str = ""
+        self._quote_var = tk.StringVar(value=self._next_quote())
+        self._quote_after_id: Optional[str] = None
+        self._build()
+        self._rotate_quote()
+
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _next_quote(self) -> str:
+        """Pick a quote that differs from the current one."""
+        pool = [q for q in _QUOTES if q != self._last_quote] or _QUOTES
+        choice = random.choice(pool)
+        self._last_quote = choice
+        return choice
+
+    def _build(self) -> None:
+        # ── section header ──
+        hdr = tk.Frame(self, bg=C_HEADER)
+        hdr.pack(fill=tk.X)
+        _lbl(hdr, "📅  Next 7 Days", bg=C_HEADER, fg="#ffffff",
+             font=F_MEDB).pack(side=tk.LEFT, padx=10, pady=6)
+
+        tk.Frame(self, bg=C_BORDER, height=1).pack(fill=tk.X)
+
+        today = date.today()
+        for i in range(7):
+            d = today + timedelta(days=i)
+            booker = get_booking_for_date(d)
+
+            if i > 0:
+                tk.Frame(self, bg=C_BORDER, height=1).pack(fill=tk.X, padx=8)
+
+            row = tk.Frame(self, bg=C_CARD)
+            row.pack(fill=tk.X)
+
+            # Colour bar on the left
+            colour = C_BOOKED if booker else C_FREE
+            tk.Frame(row, bg=colour, width=4).pack(side=tk.LEFT, fill=tk.Y)
+
+            content = tk.Frame(row, bg=C_CARD)
+            content.pack(side=tk.LEFT, fill=tk.BOTH, expand=True,
+                         padx=8, pady=4)
+
+            day_label = "Today" if i == 0 else d.strftime("%a %d %b")
+            fg_day = C_ACCENT if i == 0 else C_SUBTEXT
+            _lbl(content, day_label, bg=C_CARD, fg=fg_day,
+                 font=F_SMALL).pack(side=tk.LEFT)
+
+            status_text = booker if booker else "Free"
+            _lbl(content, status_text, bg=C_CARD,
+                 fg=C_BOOKED if booker else C_FREE,
+                 font=F_SMALL).pack(side=tk.RIGHT)
+
+        # ── fun quote ──
+        tk.Frame(self, bg=C_BORDER, height=1).pack(fill=tk.X, pady=(6, 0))
+        tk.Label(
+            self, textvariable=self._quote_var,
+            bg=C_CARD, fg=C_SUBTEXT,
+            font=("Helvetica", 9, "italic"),
+            wraplength=300, justify=tk.CENTER,
+        ).pack(pady=6, padx=8)
+
+    def _rotate_quote(self) -> None:
+        if not self.winfo_exists():
+            return
+        self._quote_var.set(self._next_quote())
+        self._quote_after_id = self.after(self._QUOTE_ROTATION_MS, self._rotate_quote)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -447,38 +550,51 @@ class MainScreen(_Screen):
              bg=C_HEADER, fg="#ffffff", font=F_SMALL, padx=8, pady=4
              ).pack(side=tk.RIGHT, padx=4)
 
-        # ── body ──
+        # ── body: landscape two-column layout ──
         body = tk.Frame(self, bg=C_BG)
         body.pack(fill=tk.BOTH, expand=True)
 
         today  = date.today()
         booker = get_booking_for_date(today)
 
-        # ── date + live clock row ──
-        info_row = tk.Frame(body, bg=C_BG)
-        info_row.pack(pady=(16, 4))
+        # ── LEFT column: date/clock, status, book button ──────────────────────
+        left = tk.Frame(body, bg=C_BG)
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True,
+                  padx=(16, 8), pady=12)
+
+        # date + live clock row
+        info_row = tk.Frame(left, bg=C_BG)
+        info_row.pack(fill=tk.X, pady=(0, 8))
 
         day_str = today.strftime("%A, %d %B %Y").replace(" 0", " ")
         _lbl(info_row, day_str, bg=C_BG, fg=C_SUBTEXT,
-             font=F_MED).pack(side=tk.LEFT, padx=(0, 20))
+             font=F_MED).pack(side=tk.LEFT)
 
         tk.Label(
             info_row, textvariable=self._clock_var,
             bg=C_BG, fg=C_ACCENT,
             font=("Helvetica", 20, "bold"),
-        ).pack(side=tk.LEFT)
+        ).pack(side=tk.RIGHT)
 
-        # ── status card ──
+        # status card (fills left column width)
         StatusCard(
-            body,
+            left,
             is_booked=bool(booker),
             booker_name=booker or "",
-        ).pack(pady=8)
+        ).pack(fill=tk.X, pady=(0, 12))
 
-        # ── book button ──
-        _btn(body, "  Book This Desk  ", self.app.show_booking,
+        # book button
+        _btn(left, "  Book This Desk  ", self.app.show_booking,
              bg=C_ACCENT, fg=C_CARD, font=F_LARGE,
-             padx=30, pady=14).pack(pady=12)
+             padx=30, pady=14).pack(pady=4)
+
+        # ── RIGHT column: weekly availability widget ───────────────────────────
+        right = tk.Frame(body, bg=C_BG, width=_WEEKLY_WIDGET_W)
+        right.pack(side=tk.RIGHT, fill=tk.Y, padx=(8, 16), pady=12)
+        right.pack_propagate(False)
+
+        WeeklyAvailabilityWidget(right).pack(fill=tk.BOTH, expand=True)
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -643,6 +759,8 @@ class BookingScreen(_Screen):
 
         dates = self._cal.get_selected()
         add_bookings(self._name, dates)
+        date_strs = ", ".join(d.strftime("%Y-%m-%d") for d in dates)
+        _log.info("BOOKED  name=%r  dates=[%s]", self._name, date_strs)
         self._set_status(
             f"Booked {len(dates)} day(s) for {self._name}.", colour=C_FREE)
         self.after(1500, self.app.show_main)
@@ -660,6 +778,7 @@ class BookingScreen(_Screen):
             add_recurring_booking(self._name, wd)
 
         day_names = ", ".join(WEEKDAYS[i] for i in chosen)
+        _log.info("RECURRING  name=%r  weekdays=[%s]", self._name, day_names)
         self._set_status(
             f"Recurring booking saved: every {day_names} for {self._name}.",
             colour=C_FREE)
@@ -758,6 +877,7 @@ class BookingsListScreen(_Screen):
                  padx=8, pady=2).pack(side=tk.LEFT, padx=4)
 
     def _confirm_delete(self, booking_id: int) -> None:
+        _log.info("DELETED  booking_id=%d", booking_id)
         delete_booking(booking_id)
         for w in self.winfo_children():
             w.destroy()
