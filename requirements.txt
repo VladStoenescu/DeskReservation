@@ -1,0 +1,6 @@
+# Desk Reservation – Python dependencies
+# All dependencies are from the Python standard library.
+# No pip packages are required.
+#
+# System packages needed on Raspberry Pi OS:
+#   sudo apt-get install -y python3-tk
