@@ -59,10 +59,12 @@ export default function App() {
 
       {/* ── Screen ── */}
       <div className="content">
-        {screen === 'home'    && <StatusScreen navigate={navigate} showToast={showToast} />}
-        {screen === 'booking' && <BookingScreen navigate={navigate} showToast={showToast} />}
-        {screen === 'list'    && <BookingsList navigate={navigate} showToast={showToast} />}
-        {screen === 'info'    && <InfoScreen />}
+        <div key={screen} className="screen-enter">
+          {screen === 'home'    && <StatusScreen navigate={navigate} showToast={showToast} />}
+          {screen === 'booking' && <BookingScreen navigate={navigate} showToast={showToast} />}
+          {screen === 'list'    && <BookingsList navigate={navigate} showToast={showToast} />}
+          {screen === 'info'    && <InfoScreen />}
+        </div>
       </div>
     </div>
   )

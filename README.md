@@ -56,11 +56,27 @@ python3 api.py
 
 # Custom port
 python3 api.py --port 8080
-
-# Development (Vite dev server with hot reload, API proxied to Flask)
-python3 api.py &
-cd frontend && npm run dev
 ```
+
+### Development mode (hot-reload)
+
+Run **both** the Flask API and the Vite dev server at the same time.
+Vite proxies all `/api/*` requests to Flask automatically (configured in `vite.config.js`).
+
+**Terminal 1 — Flask backend:**
+```bash
+python3 api.py
+```
+
+**Terminal 2 — Vite frontend (hot-reload):**
+```bash
+cd frontend
+npm run dev
+```
+
+Then open **http://localhost:5173** in your browser.
+Any change you save to a `.jsx` or `.css` file is reflected instantly without a page reload.
+The Flask API keeps running on port 5000 and is proxied transparently.
 
 ### Kiosk mode on Raspberry Pi (Chromium fullscreen)
 
