@@ -8,7 +8,7 @@ Run with:
 
 import sys
 import calendar
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Set
 
 import tkinter as tk
@@ -27,27 +27,27 @@ from database import (
 SCREEN_W = 800
 SCREEN_H = 480
 
-# ─── Colour palette (dark GitHub-inspired) ────────────────────────────────────
-C_BG      = "#0d1117"
-C_CARD    = "#161b22"
-C_HEADER  = "#21262d"
-C_BORDER  = "#30363d"
-C_TEXT    = "#e6edf3"
-C_SUBTEXT = "#8b949e"
-C_FREE    = "#2ea043"    # green  – desk available
-C_BOOKED  = "#da3633"    # red    – desk taken
-C_ACCENT  = "#1f6feb"    # blue   – selected / primary action
-C_WARN    = "#d29922"    # amber  – recurring
-C_BTN     = "#21262d"
-C_BTN_H   = "#30363d"
+# ─── Colour palette (neon cyberpunk) ─────────────────────────────────────────
+C_BG      = "#030c1a"    # deep-space black
+C_CARD    = "#071428"    # dark-navy card
+C_HEADER  = "#0a1e35"    # header navy
+C_BORDER  = "#1a3a5c"    # muted border
+C_TEXT    = "#d0e8ff"    # cool blue-white
+C_SUBTEXT = "#4a7a9b"    # muted blue
+C_FREE    = "#00ff88"    # neon green  – desk available
+C_BOOKED  = "#ff0044"    # neon red    – desk taken
+C_ACCENT  = "#00d4ff"    # neon cyan   – primary action / selected
+C_WARN    = "#ffaa00"    # neon amber  – recurring
+C_BTN     = "#0a1e35"
+C_BTN_H   = "#1a3a5c"
 
 # ─── Typography ───────────────────────────────────────────────────────────────
-F_HUGE  = ("Helvetica", 28, "bold")
-F_TITLE = ("Helvetica", 17, "bold")
-F_LARGE = ("Helvetica", 14, "bold")
-F_MED   = ("Helvetica", 12)
-F_MEDB  = ("Helvetica", 12, "bold")
-F_SMALL = ("Helvetica", 10)
+F_HUGE  = ("Courier", 28, "bold")
+F_TITLE = ("Courier", 17, "bold")
+F_LARGE = ("Courier", 14, "bold")
+F_MED   = ("Courier", 12)
+F_MEDB  = ("Courier", 12, "bold")
+F_SMALL = ("Courier", 10)
 
 # ─── Weekday names ────────────────────────────────────────────────────────────
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -322,6 +322,109 @@ class CalendarWidget(tk.Frame):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Animated status card (Canvas-based, futuristic glow + scan-line)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class AnimatedStatusCard(tk.Canvas):
+    """Futuristic animated status card with pulsing glow border and scan-line.
+
+    The border cycles through shades of neon green (free) or neon red (booked),
+    and a horizontal scan-line sweeps downward continuously.
+    """
+
+    _W = 700
+    _H = 150
+
+    # Pulse sequences: darkest → brightest → darkest
+    _PULSE_FREE   = ["#004422", "#006633", "#009944", "#00cc55",
+                     "#00ff88", "#00cc55", "#009944", "#006633"]
+    _PULSE_BOOKED = ["#550011", "#880022", "#bb0033", "#ee003c",
+                     "#ff0044", "#ee003c", "#bb0033", "#880022"]
+
+    def __init__(self, parent: tk.Widget,
+                 is_booked: bool, booker_name: str = "") -> None:
+        super().__init__(
+            parent,
+            width=self._W, height=self._H,
+            bg=C_BG, highlightthickness=0,
+        )
+        self._is_booked = is_booked
+        self._booker    = booker_name
+        self._step      = 0
+        self._scan_y    = 6
+        self._tick()
+
+    # ── animation loop ────────────────────────────────────────────────────────
+
+    def _tick(self) -> None:
+        if not self.winfo_exists():
+            return
+
+        seq  = self._PULSE_BOOKED if self._is_booked else self._PULSE_FREE
+        glow = seq[self._step % len(seq)]
+        dim  = seq[0]
+        w, h = self._W, self._H
+
+        self.delete("all")
+
+        # ── background fill ──
+        self.create_rectangle(0, 0, w, h, fill=C_BG, outline="")
+
+        # ── subtle outer glow ring ──
+        self.create_rectangle(2, 2, w - 2, h - 2,
+                              fill="", outline=dim, width=1)
+
+        # ── main card body ──
+        self.create_rectangle(6, 6, w - 6, h - 6,
+                              fill=C_CARD, outline=glow, width=2)
+
+        # ── corner accent brackets ──
+        cs = 18   # bracket arm length
+        for x1, y1, x2, y2 in [
+            (6,       6,       6 + cs,  6      ),  # top-left  horizontal
+            (6,       6,       6,       6 + cs ),  # top-left  vertical
+            (w-6-cs,  6,       w-6,     6      ),  # top-right horizontal
+            (w-6,     6,       w-6,     6 + cs ),  # top-right vertical
+            (6,       h-6,     6 + cs,  h-6    ),  # btm-left  horizontal
+            (6,       h-6-cs,  6,       h-6    ),  # btm-left  vertical
+            (w-6-cs,  h-6,     w-6,     h-6    ),  # btm-right horizontal
+            (w-6,     h-6-cs,  w-6,     h-6    ),  # btm-right vertical
+        ]:
+            self.create_line(x1, y1, x2, y2, fill=glow, width=3)
+
+        # ── moving scan-line ──
+        self.create_rectangle(8, self._scan_y, w - 8, self._scan_y + 2,
+                              fill=glow, outline="")
+
+        # ── status text ──
+        if self._is_booked:
+            self.create_text(
+                w // 2, h // 3,
+                text="▶  DESK IS BOOKED  ◀",
+                fill=glow, font=("Courier", 16, "bold"), anchor="center",
+            )
+            self.create_text(
+                w // 2, 2 * h // 3 + 4,
+                text=self._booker,
+                fill=C_TEXT, font=("Courier", 22, "bold"), anchor="center",
+            )
+        else:
+            self.create_text(
+                w // 2, h // 2,
+                text="▶  DESK IS FREE  ◀",
+                fill=glow, font=("Courier", 24, "bold"), anchor="center",
+            )
+
+        # ── advance pulse & scan state ──
+        self._step   = (self._step + 1) % len(seq)
+        self._scan_y = self._scan_y + 3
+        if self._scan_y > h - 8:
+            self._scan_y = 6
+
+        self.after(80, self._tick)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Screen base class
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -336,12 +439,15 @@ class _Screen(tk.Frame):
         bar.pack(fill=tk.X)
         bar.pack_propagate(False)
 
-        _lbl(bar, title, bg=C_HEADER, fg=C_TEXT,
+        _lbl(bar, title, bg=C_HEADER, fg=C_ACCENT,
              font=F_TITLE).pack(side=tk.LEFT, padx=16)
         if back_cmd:
             _btn(bar, "← Back", back_cmd,
                  bg=C_HEADER, font=F_MED,
                  padx=10, pady=4).pack(side=tk.RIGHT, padx=8)
+
+        # Neon accent separator
+        tk.Frame(self, bg=C_ACCENT, height=2).pack(fill=tk.X)
         return bar
 
 
@@ -352,20 +458,36 @@ class _Screen(tk.Frame):
 class MainScreen(_Screen):
     def __init__(self, parent: tk.Widget, app: "DeskReservationApp") -> None:
         super().__init__(parent, app)
+        self._clock_var      = tk.StringVar()
+        self._clock_after_id: Optional[str] = None
         self._build()
+        self._update_clock()
 
     def refresh(self) -> None:
+        if self._clock_after_id:
+            self.after_cancel(self._clock_after_id)
+            self._clock_after_id = None
         for w in self.winfo_children():
             w.destroy()
         self._build()
+        self._update_clock()
+
+    def _update_clock(self) -> None:
+        """Update the live clock every 500 ms with a blinking colon."""
+        if not self.winfo_exists():
+            return
+        now = datetime.now()
+        sep = ":" if now.second % 2 == 0 else " "
+        self._clock_var.set(now.strftime(f"%H{sep}%M{sep}%S"))
+        self._clock_after_id = self.after(500, self._update_clock)
 
     def _build(self) -> None:
         # ── header ──
-        bar = self._make_header("🖥  Desk Reservation")
+        bar = self._make_header("[ DESK RESERVATION ]")
         _btn(bar, "ℹ  Info", self.app.show_info,
              bg=C_HEADER, font=F_SMALL, padx=8, pady=4
              ).pack(side=tk.RIGHT, padx=4)
-        _btn(bar, "📋  Bookings", self.app.show_bookings_list,
+        _btn(bar, "Bookings", self.app.show_bookings_list,
              bg=C_HEADER, font=F_SMALL, padx=8, pady=4
              ).pack(side=tk.RIGHT, padx=4)
 
@@ -373,31 +495,34 @@ class MainScreen(_Screen):
         body = tk.Frame(self, bg=C_BG)
         body.pack(fill=tk.BOTH, expand=True)
 
-        today   = date.today()
-        booker  = get_booking_for_date(today)
+        today  = date.today()
+        booker = get_booking_for_date(today)
+
+        # ── date + live clock row ──
+        info_row = tk.Frame(body, bg=C_BG)
+        info_row.pack(pady=(16, 4))
+
         day_str = today.strftime("%A, %d %B %Y").replace(" 0", " ")
+        _lbl(info_row, day_str, bg=C_BG, fg=C_SUBTEXT,
+             font=F_MED).pack(side=tk.LEFT, padx=(0, 20))
 
-        _lbl(body, day_str, bg=C_BG, fg=C_SUBTEXT,
-             font=F_LARGE).pack(pady=(28, 10))
+        tk.Label(
+            info_row, textvariable=self._clock_var,
+            bg=C_BG, fg=C_ACCENT,
+            font=("Courier", 20, "bold"),
+        ).pack(side=tk.LEFT)
 
-        # Status card
-        if booker:
-            card = tk.Frame(body, bg=C_BOOKED, pady=18, padx=50)
-            card.pack(pady=6)
-            _lbl(card, "● DESK IS BOOKED",
-                 bg=C_BOOKED, fg=C_TEXT, font=F_TITLE).pack()
-            _lbl(card, booker,
-                 bg=C_BOOKED, fg=C_TEXT, font=F_HUGE).pack(pady=(6, 0))
-        else:
-            card = tk.Frame(body, bg=C_FREE, pady=18, padx=50)
-            card.pack(pady=6)
-            _lbl(card, "● DESK IS FREE",
-                 bg=C_FREE, fg=C_TEXT, font=F_HUGE).pack()
+        # ── animated status card ──
+        AnimatedStatusCard(
+            body,
+            is_booked=bool(booker),
+            booker_name=booker or "",
+        ).pack(pady=8)
 
-        # Book button
-        _btn(body, "  📅  BOOK THIS DESK  ", self.app.show_booking,
-             bg=C_ACCENT, fg=C_TEXT, font=F_TITLE,
-             padx=30, pady=14).pack(pady=20)
+        # ── book button ──
+        _btn(body, "  [ BOOK THIS DESK ]  ", self.app.show_booking,
+             bg=C_ACCENT, fg=C_BG, font=F_LARGE,
+             padx=30, pady=14).pack(pady=12)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
