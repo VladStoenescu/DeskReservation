@@ -12,7 +12,6 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Set
 
 import tkinter as tk
-from tkinter import messagebox
 
 from database import (
     init_db,
@@ -27,27 +26,27 @@ from database import (
 SCREEN_W = 800
 SCREEN_H = 480
 
-# ─── Colour palette (neon cyberpunk) ─────────────────────────────────────────
-C_BG      = "#030c1a"    # deep-space black
-C_CARD    = "#071428"    # dark-navy card
-C_HEADER  = "#0a1e35"    # header navy
-C_BORDER  = "#1a3a5c"    # muted border
-C_TEXT    = "#d0e8ff"    # cool blue-white
-C_SUBTEXT = "#4a7a9b"    # muted blue
-C_FREE    = "#00ff88"    # neon green  – desk available
-C_BOOKED  = "#ff0044"    # neon red    – desk taken
-C_ACCENT  = "#00d4ff"    # neon cyan   – primary action / selected
-C_WARN    = "#ffaa00"    # neon amber  – recurring
-C_BTN     = "#0a1e35"
-C_BTN_H   = "#1a3a5c"
+# ─── Colour palette (corporate / banking) ────────────────────────────────────
+C_BG      = "#f4f6f9"    # light gray background
+C_CARD    = "#ffffff"    # white card
+C_HEADER  = "#1e3a5f"    # deep navy header
+C_BORDER  = "#d0d7e1"    # light border
+C_TEXT    = "#1a2942"    # dark navy text
+C_SUBTEXT = "#64748b"    # medium gray
+C_FREE    = "#16a34a"    # professional green  – desk available
+C_BOOKED  = "#dc2626"    # professional red    – desk taken
+C_ACCENT  = "#2563eb"    # corporate blue      – primary action
+C_WARN    = "#d97706"    # amber               – recurring
+C_BTN     = "#f1f5f9"    # light button background
+C_BTN_H   = "#e2e8f0"    # button hover
 
 # ─── Typography ───────────────────────────────────────────────────────────────
-F_HUGE  = ("Courier", 28, "bold")
-F_TITLE = ("Courier", 17, "bold")
-F_LARGE = ("Courier", 14, "bold")
-F_MED   = ("Courier", 12)
-F_MEDB  = ("Courier", 12, "bold")
-F_SMALL = ("Courier", 10)
+F_HUGE  = ("Helvetica", 28, "bold")
+F_TITLE = ("Helvetica", 17, "bold")
+F_LARGE = ("Helvetica", 14, "bold")
+F_MED   = ("Helvetica", 12)
+F_MEDB  = ("Helvetica", 12, "bold")
+F_SMALL = ("Helvetica", 10)
 
 # ─── Weekday names ────────────────────────────────────────────────────────────
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -180,6 +179,11 @@ class OnScreenKeyboard(tk.Toplevel):
             command=self._done,
         ).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
 
+        # ── inline error label ──
+        self._error_lbl = tk.Label(self, text="", bg=C_BG, fg=C_BOOKED,
+                                   font=F_SMALL)
+        self._error_lbl.pack(fill=tk.X, padx=8)
+
     def _press(self, ch: str) -> None:
         self._text.set(self._text.get() + ch)
 
@@ -191,7 +195,7 @@ class OnScreenKeyboard(tk.Toplevel):
     def _done(self) -> None:
         name = self._text.get().strip()
         if not name:
-            messagebox.showwarning("No name", "Please enter a name.", parent=self)
+            self._error_lbl.config(text="Please enter a name.")
             return
         self.result = name
         self.destroy()
@@ -322,106 +326,58 @@ class CalendarWidget(tk.Frame):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Animated status card (Canvas-based, futuristic glow + scan-line)
+# Status card (clean corporate style)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class AnimatedStatusCard(tk.Canvas):
-    """Futuristic animated status card with pulsing glow border and scan-line.
-
-    The border cycles through shades of neon green (free) or neon red (booked),
-    and a horizontal scan-line sweeps downward continuously.
-    """
+class StatusCard(tk.Frame):
+    """Corporate-style status card showing whether the desk is free or booked."""
 
     _W = 700
-    _H = 150
-
-    # Pulse sequences: darkest → brightest → darkest
-    _PULSE_FREE   = ["#004422", "#006633", "#009944", "#00cc55",
-                     "#00ff88", "#00cc55", "#009944", "#006633"]
-    _PULSE_BOOKED = ["#550011", "#880022", "#bb0033", "#ee003c",
-                     "#ff0044", "#ee003c", "#bb0033", "#880022"]
+    _H = 140
 
     def __init__(self, parent: tk.Widget,
                  is_booked: bool, booker_name: str = "") -> None:
         super().__init__(
             parent,
+            bg=C_CARD,
             width=self._W, height=self._H,
-            bg=C_BG, highlightthickness=0,
+            highlightbackground=C_BORDER, highlightthickness=1,
         )
-        self._is_booked = is_booked
-        self._booker    = booker_name
-        self._step      = 0
-        self._scan_y    = 6
-        self._tick()
+        self.pack_propagate(False)
 
-    # ── animation loop ────────────────────────────────────────────────────────
+        status_color = C_BOOKED if is_booked else C_FREE
 
-    def _tick(self) -> None:
-        if not self.winfo_exists():
-            return
+        # Colour bar on the left
+        bar = tk.Frame(self, bg=status_color, width=8)
+        bar.pack(side=tk.LEFT, fill=tk.Y)
+        bar.pack_propagate(False)
 
-        seq  = self._PULSE_BOOKED if self._is_booked else self._PULSE_FREE
-        glow = seq[self._step % len(seq)]
-        dim  = seq[0]
-        w, h = self._W, self._H
+        content = tk.Frame(self, bg=C_CARD)
+        content.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=20, pady=12)
 
-        self.delete("all")
-
-        # ── background fill ──
-        self.create_rectangle(0, 0, w, h, fill=C_BG, outline="")
-
-        # ── subtle outer glow ring ──
-        self.create_rectangle(2, 2, w - 2, h - 2,
-                              fill="", outline=dim, width=1)
-
-        # ── main card body ──
-        self.create_rectangle(6, 6, w - 6, h - 6,
-                              fill=C_CARD, outline=glow, width=2)
-
-        # ── corner accent brackets ──
-        cs = 18   # bracket arm length
-        for x1, y1, x2, y2 in [
-            (6,       6,       6 + cs,  6      ),  # top-left  horizontal
-            (6,       6,       6,       6 + cs ),  # top-left  vertical
-            (w-6-cs,  6,       w-6,     6      ),  # top-right horizontal
-            (w-6,     6,       w-6,     6 + cs ),  # top-right vertical
-            (6,       h-6,     6 + cs,  h-6    ),  # btm-left  horizontal
-            (6,       h-6-cs,  6,       h-6    ),  # btm-left  vertical
-            (w-6-cs,  h-6,     w-6,     h-6    ),  # btm-right horizontal
-            (w-6,     h-6-cs,  w-6,     h-6    ),  # btm-right vertical
-        ]:
-            self.create_line(x1, y1, x2, y2, fill=glow, width=3)
-
-        # ── moving scan-line ──
-        self.create_rectangle(8, self._scan_y, w - 8, self._scan_y + 2,
-                              fill=glow, outline="")
-
-        # ── status text ──
-        if self._is_booked:
-            self.create_text(
-                w // 2, h // 3,
-                text="▶  DESK IS BOOKED  ◀",
-                fill=glow, font=("Courier", 16, "bold"), anchor="center",
-            )
-            self.create_text(
-                w // 2, 2 * h // 3 + 4,
-                text=self._booker,
-                fill=C_TEXT, font=("Courier", 22, "bold"), anchor="center",
-            )
+        if is_booked:
+            tk.Label(
+                content,
+                text="DESK IS BOOKED",
+                bg=C_CARD, fg=status_color,
+                font=("Helvetica", 18, "bold"),
+                anchor="w",
+            ).pack(fill=tk.X)
+            tk.Label(
+                content,
+                text=booker_name,
+                bg=C_CARD, fg=C_TEXT,
+                font=("Helvetica", 24, "bold"),
+                anchor="w",
+            ).pack(fill=tk.X, pady=(4, 0))
         else:
-            self.create_text(
-                w // 2, h // 2,
-                text="▶  DESK IS FREE  ◀",
-                fill=glow, font=("Courier", 24, "bold"), anchor="center",
-            )
-
-        # ── advance pulse & scan state ──
-        self._step   = (self._step + 1) % len(seq)
-        self._scan_y = self._scan_y + 3
-        if self._scan_y > h - 8:
-            self._scan_y = 6
-
-        self.after(80, self._tick)
+            tk.Label(
+                content,
+                text="DESK IS AVAILABLE",
+                bg=C_CARD, fg=status_color,
+                font=("Helvetica", 24, "bold"),
+                anchor="w",
+            ).pack(fill=tk.BOTH, expand=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -439,15 +395,15 @@ class _Screen(tk.Frame):
         bar.pack(fill=tk.X)
         bar.pack_propagate(False)
 
-        _lbl(bar, title, bg=C_HEADER, fg=C_ACCENT,
+        _lbl(bar, title, bg=C_HEADER, fg="#ffffff",
              font=F_TITLE).pack(side=tk.LEFT, padx=16)
         if back_cmd:
             _btn(bar, "← Back", back_cmd,
-                 bg=C_HEADER, font=F_MED,
+                 bg=C_HEADER, fg="#ffffff", font=F_MED,
                  padx=10, pady=4).pack(side=tk.RIGHT, padx=8)
 
-        # Neon accent separator
-        tk.Frame(self, bg=C_ACCENT, height=2).pack(fill=tk.X)
+        # Accent separator
+        tk.Frame(self, bg=C_BORDER, height=1).pack(fill=tk.X)
         return bar
 
 
@@ -483,12 +439,12 @@ class MainScreen(_Screen):
 
     def _build(self) -> None:
         # ── header ──
-        bar = self._make_header("[ DESK RESERVATION ]")
+        bar = self._make_header("Desk Reservation")
         _btn(bar, "ℹ  Info", self.app.show_info,
-             bg=C_HEADER, font=F_SMALL, padx=8, pady=4
+             bg=C_HEADER, fg="#ffffff", font=F_SMALL, padx=8, pady=4
              ).pack(side=tk.RIGHT, padx=4)
         _btn(bar, "Bookings", self.app.show_bookings_list,
-             bg=C_HEADER, font=F_SMALL, padx=8, pady=4
+             bg=C_HEADER, fg="#ffffff", font=F_SMALL, padx=8, pady=4
              ).pack(side=tk.RIGHT, padx=4)
 
         # ── body ──
@@ -509,19 +465,19 @@ class MainScreen(_Screen):
         tk.Label(
             info_row, textvariable=self._clock_var,
             bg=C_BG, fg=C_ACCENT,
-            font=("Courier", 20, "bold"),
+            font=("Helvetica", 20, "bold"),
         ).pack(side=tk.LEFT)
 
-        # ── animated status card ──
-        AnimatedStatusCard(
+        # ── status card ──
+        StatusCard(
             body,
             is_booked=bool(booker),
             booker_name=booker or "",
         ).pack(pady=8)
 
         # ── book button ──
-        _btn(body, "  [ BOOK THIS DESK ]  ", self.app.show_booking,
-             bg=C_ACCENT, fg=C_BG, font=F_LARGE,
+        _btn(body, "  Book This Desk  ", self.app.show_booking,
+             bg=C_ACCENT, fg=C_CARD, font=F_LARGE,
              padx=30, pady=14).pack(pady=12)
 
 
@@ -544,7 +500,12 @@ class BookingScreen(_Screen):
 
     def _build(self) -> None:
         # ── header ──
-        self._make_header("📅  New Booking", back_cmd=self.app.show_main)
+        self._make_header("New Booking", back_cmd=self.app.show_main)
+
+        # ── inline status banner ──
+        self._status_lbl = tk.Label(self, text="", bg=C_BG, fg=C_BOOKED,
+                                    font=F_SMALL, anchor="w")
+        self._status_lbl.pack(fill=tk.X, padx=16, pady=(4, 0))
 
         # ── name row ──
         name_row = tk.Frame(self, bg=C_CARD, height=56)
@@ -565,7 +526,7 @@ class BookingScreen(_Screen):
         self._name_lbl.bind("<Button-1>", lambda _e: self._ask_name())
 
         _btn(name_row, "✏", self._ask_name,
-             bg=C_BTN, font=F_LARGE, padx=10, pady=4
+             bg=C_BTN, fg=C_TEXT, font=F_LARGE, padx=10, pady=4
              ).pack(side=tk.RIGHT, padx=8)
 
         # ── mode toggle ──
@@ -620,7 +581,7 @@ class BookingScreen(_Screen):
         self._update_summary()
 
         _btn(right, "✓  Save Booking", self._save_onetime,
-             bg=C_FREE, fg=C_TEXT, font=F_MEDB,
+             bg=C_FREE, fg="#ffffff", font=F_MEDB,
              padx=12, pady=10).pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 8))
 
     def _build_recurring(self) -> None:
@@ -642,7 +603,7 @@ class BookingScreen(_Screen):
             cb.pack(anchor=tk.W, pady=2)
 
         _btn(frm, "✓  Save Recurring Booking", self._save_recurring,
-             bg=C_WARN, fg=C_TEXT, font=F_MEDB,
+             bg=C_ACCENT, fg="#ffffff", font=F_MEDB,
              padx=12, pady=10).pack(pady=20)
 
     # ── actions ───────────────────────────────────────────────────────────────
@@ -652,6 +613,11 @@ class BookingScreen(_Screen):
         if name is not None:
             self._name = name
             self._name_lbl.config(text=name, fg=C_TEXT)
+
+    def _set_status(self, msg: str, colour: str = C_BOOKED) -> None:
+        """Show *msg* inline; auto-clear after 4 seconds."""
+        self._status_lbl.config(text=msg, fg=colour)
+        self.after(4000, lambda: self._status_lbl.config(text=""))
 
     def _update_summary(self) -> None:
         if self._cal is None:
@@ -669,42 +635,35 @@ class BookingScreen(_Screen):
 
     def _save_onetime(self) -> None:
         if not self._name:
-            messagebox.showwarning("No name",
-                                   "Please enter your name first.", parent=self)
+            self._set_status("Please enter your name first.")
             return
         if self._cal is None or not self._cal.get_selected():
-            messagebox.showwarning("No days",
-                                   "Please select at least one day.", parent=self)
+            self._set_status("Please select at least one day.")
             return
 
         dates = self._cal.get_selected()
         add_bookings(self._name, dates)
-        messagebox.showinfo("Booking saved",
-                            f"Booked {len(dates)} day(s) for {self._name}.",
-                            parent=self)
-        self.app.show_main()
+        self._set_status(
+            f"Booked {len(dates)} day(s) for {self._name}.", colour=C_FREE)
+        self.after(1500, self.app.show_main)
 
     def _save_recurring(self) -> None:
         if not self._name:
-            messagebox.showwarning("No name",
-                                   "Please enter your name first.", parent=self)
+            self._set_status("Please enter your name first.")
             return
         chosen = [i for i, v in enumerate(self._wd_vars) if v.get()]
         if not chosen:
-            messagebox.showwarning("No weekdays",
-                                   "Please select at least one weekday.", parent=self)
+            self._set_status("Please select at least one weekday.")
             return
 
         for wd in chosen:
             add_recurring_booking(self._name, wd)
 
         day_names = ", ".join(WEEKDAYS[i] for i in chosen)
-        messagebox.showinfo(
-            "Recurring booking saved",
-            f"Booked every {day_names} for {self._name}.",
-            parent=self,
-        )
-        self.app.show_main()
+        self._set_status(
+            f"Recurring booking saved: every {day_names} for {self._name}.",
+            colour=C_FREE)
+        self.after(1500, self.app.show_main)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -717,7 +676,7 @@ class BookingsListScreen(_Screen):
         self._build()
 
     def _build(self) -> None:
-        self._make_header("📋  Upcoming Bookings", back_cmd=self.app.show_main)
+        self._make_header("Upcoming Bookings", back_cmd=self.app.show_main)
 
         container = tk.Frame(self, bg=C_BG)
         container.pack(fill=tk.BOTH, expand=True, padx=8, pady=6)
@@ -740,6 +699,9 @@ class BookingsListScreen(_Screen):
 
         inner.bind("<Configure>", _on_configure)
         canvas.bind("<Configure>", _on_configure)
+
+        self._confirm_rows: Dict[int, tk.Frame] = {}
+        self._booking_rows: Dict[int, tk.Frame] = {}
 
         bookings = get_future_bookings()
         if not bookings:
@@ -764,17 +726,49 @@ class BookingsListScreen(_Screen):
                 _lbl(row, "(recurring)",
                      bg=C_CARD, fg=C_WARN, font=F_SMALL).pack(side=tk.LEFT, padx=4)
 
-            _btn(row, "✕", lambda bid=bk["id"]: self._delete(bid),
-                 bg=C_BOOKED, fg=C_TEXT, font=F_SMALL,
+            _btn(row, "✕  Remove", lambda bid=bk["id"]: self._delete(bid),
+                 bg=C_BOOKED, fg="#ffffff", font=F_SMALL,
                  padx=8, pady=2).pack(side=tk.RIGHT, padx=8)
+            self._booking_rows[bk["id"]] = row
 
     def _delete(self, booking_id: int) -> None:
-        if messagebox.askyesno("Delete booking",
-                               "Delete this booking?", parent=self):
-            delete_booking(booking_id)
-            for w in self.winfo_children():
-                w.destroy()
-            self._build()
+        """Show an inline confirmation row; no pop-up dialog."""
+        # Find the booking row that owns this button by walking up to inner frame
+        # and appending a confirm strip beneath it.
+        for row in self._confirm_rows.values():
+            row.destroy()
+        self._confirm_rows.clear()
+
+        # Locate the row widget (parent of the ✕ button) via the stored ref
+        if booking_id in self._booking_rows:
+            ref_row = self._booking_rows[booking_id]
+            confirm = tk.Frame(ref_row.master, bg="#fff3cd", pady=4,
+                               highlightbackground=C_WARN, highlightthickness=1)
+            confirm.pack(fill=tk.X, padx=4, pady=(0, 3))
+            self._confirm_rows[booking_id] = confirm
+
+            _lbl(confirm, "Delete this booking?",
+                 bg="#fff3cd", fg=C_TEXT, font=F_SMALL
+                 ).pack(side=tk.LEFT, padx=12)
+            _btn(confirm, "Yes, delete", lambda bid=booking_id: self._confirm_delete(bid),
+                 bg=C_BOOKED, fg="#ffffff", font=F_SMALL,
+                 padx=8, pady=2).pack(side=tk.LEFT, padx=4)
+            _btn(confirm, "Cancel", self._cancel_confirm,
+                 bg=C_BTN, fg=C_TEXT, font=F_SMALL,
+                 padx=8, pady=2).pack(side=tk.LEFT, padx=4)
+
+    def _confirm_delete(self, booking_id: int) -> None:
+        delete_booking(booking_id)
+        for w in self.winfo_children():
+            w.destroy()
+        self._confirm_rows = {}
+        self._booking_rows = {}
+        self._build()
+
+    def _cancel_confirm(self) -> None:
+        for row in self._confirm_rows.values():
+            row.destroy()
+        self._confirm_rows.clear()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -787,7 +781,7 @@ class InfoScreen(_Screen):
         self._build()
 
     def _build(self) -> None:
-        self._make_header("ℹ  How to Use", back_cmd=self.app.show_main)
+        self._make_header("How to Use", back_cmd=self.app.show_main)
 
         body = tk.Frame(self, bg=C_BG)
         body.pack(fill=tk.BOTH, expand=True, padx=24, pady=12)
@@ -798,7 +792,7 @@ class InfoScreen(_Screen):
             ("  booked (red with the booker's name displayed).", F_MED, C_SUBTEXT),
             ("", F_SMALL, C_BG),
             ("📅  Booking a desk — one-time", F_LARGE, C_TEXT),
-            ("  1. Tap  BOOK THIS DESK  on the home screen.", F_MED, C_SUBTEXT),
+            ("  1. Tap  Book This Desk  on the home screen.", F_MED, C_SUBTEXT),
             ("  2. Tap the name bar and type your name on the on-screen keyboard.", F_MED, C_SUBTEXT),
             ("  3. Select the days you want in the calendar (tap to toggle).", F_MED, C_SUBTEXT),
             ("  4. Tap  Save Booking  to confirm.", F_MED, C_SUBTEXT),

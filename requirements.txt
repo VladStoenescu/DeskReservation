@@ -1,6 +1,7 @@
 # Desk Reservation – Python dependencies
-# All dependencies are from the Python standard library.
-# No pip packages are required.
-#
+flask>=3.1
+flask-cors>=6.0
+
 # System packages needed on Raspberry Pi OS:
-#   sudo apt-get install -y python3-tk
+#   sudo apt-get install -y python3-tk   (for the Tkinter kiosk, main.py)
+#   sudo apt-get install -y nodejs npm   (to build the React frontend)
