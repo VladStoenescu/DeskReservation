@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
+import OnScreenKeyboard from './OnScreenKeyboard'
 
 export default function StatusScreen({ navigate, showToast }) {
   const [status, setStatus] = useState(null)
   const [clock, setClock] = useState('')
   const [error, setError] = useState(null)
+  const [showQuickBook, setShowQuickBook] = useState(false)
+  const [quickBooking, setQuickBooking] = useState(false)
 
   // Live clock
   useEffect(() => {
@@ -32,6 +35,30 @@ export default function StatusScreen({ navigate, showToast }) {
     const id = setInterval(fetchStatus, 60_000)
     return () => clearInterval(id)
   }, [])
+
+  const handleQuickBook = async (name) => {
+    setShowQuickBook(false)
+    setQuickBooking(true)
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type: 'onetime', dates: [today] }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || 'Failed to book desk.', 'error')
+      } else {
+        showToast(`Desk booked for ${name} today! ✓`, 'success')
+        fetchStatus()
+      }
+    } catch {
+      showToast('Network error — please try again.', 'error')
+    } finally {
+      setQuickBooking(false)
+    }
+  }
 
   if (error) {
     return (
@@ -76,10 +103,30 @@ export default function StatusScreen({ navigate, showToast }) {
         </div>
       </div>
 
-      {/* ── CTA ── */}
-      <button className="btn-primary" onClick={() => navigate('booking')}>
-        Book This Desk
-      </button>
+      {/* ── CTA buttons ── */}
+      <div className="cta-row">
+        {free && (
+          <button
+            className="btn-quick-book"
+            onClick={() => setShowQuickBook(true)}
+            disabled={quickBooking}
+          >
+            {quickBooking ? <span className="spinner" /> : '⚡ Quick Book Today'}
+          </button>
+        )}
+        <button className="btn-primary" onClick={() => navigate('booking')}>
+          {free ? 'Pick Dates' : 'Book Another Day'}
+        </button>
+      </div>
+
+      {/* ── Quick-book keyboard overlay ── */}
+      {showQuickBook && (
+        <OnScreenKeyboard
+          initialValue=""
+          onConfirm={handleQuickBook}
+          onCancel={() => setShowQuickBook(false)}
+        />
+      )}
     </div>
   )
 }
